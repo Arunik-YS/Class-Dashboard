@@ -393,30 +393,41 @@
             const memoClockEl = document.getElementById('memo-realtime-clock');
             if (memoClockEl) memoClockEl.innerText = timeString;
 
-            // 현재 시간 색상 표시 및 깜빡임 처리
             const nowMins = now.getHours() * 60 + now.getMinutes();
             let isImminent = false;
 
             if (typeof window.dashboardTimes !== 'undefined') {
+                // 기존 색상 지우기
                 document.querySelectorAll('#timetable-body tr').forEach(tr => {
                     tr.classList.remove('current-period', 'upcoming-period');
                 });
                 
                 for (const key in window.dashboardTimes) {
                     const t = window.dashboardTimes[key];
-                    if (t.start && t.end) {
-                        const [sh, sm] = t.start.split(':').map(Number);
-                        const [eh, em] = t.end.split(':').map(Number);
+                    if (t && t.start && t.end) {
+                        // 🌟 핵심: 구글 시트에서 묻어온 찌꺼기를 날리고 순수 시간(숫자, 콜론)만 추출!
+                        const cleanStart = String(t.start).replace(/[^0-9:]/g, '');
+                        const cleanEnd = String(t.end).replace(/[^0-9:]/g, '');
+                        
+                        if (!cleanStart.includes(':') || !cleanEnd.includes(':')) continue;
+
+                        const [sh, sm] = cleanStart.split(':').map(Number);
+                        const [eh, em] = cleanEnd.split(':').map(Number);
+                        
+                        if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) continue;
+
                         const startMins = sh * 60 + sm;
                         const endMins = eh * 60 + em;
                         
                         const targetRow = document.getElementById(`row-${key}`);
                         if (!targetRow) continue;
 
+                        // 현재 시간에 속하는지 확인
                         if (nowMins >= startMins && nowMins <= endMins) {
                             targetRow.classList.add('current-period');
                         }
                         
+                        // 1분 전 깜빡임 알림
                         if (['1', '2', '3', '4', '5', '6'].includes(String(key))) {
                             if (nowMins === startMins - 1) {
                                 targetRow.classList.add('upcoming-period');
@@ -772,13 +783,13 @@
 
         // 🌟 추가됨: 시간 변경 시 즉시 구글 시트에 자동 저장
         function saveTimeSetting(id, type, value) {
-            saveToSheet(`time_${type}_${id}`, value);
+            // 🌟 핵심: 구글 시트의 날짜 자동변환을 막기 위해 앞에 '_' 기호를 붙여서 강제 전송
+            saveToSheet(`time_${type}_${id}`, "_" + value); 
             
             if (!window.dashboardTimes) window.dashboardTimes = {};
             if (!window.dashboardTimes[id]) window.dashboardTimes[id] = {};
             window.dashboardTimes[id][type] = value;
             
-            // 🌟 시간이 변경되면 점심시간 위치도 즉시 재계산해서 화면에 그리기
             loadTimetable();
         }
 
