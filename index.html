@@ -563,6 +563,32 @@
             morningTr.innerHTML = `<td>아침활동</td><td colspan="4" id="cell-morning">${todayData.morning || ''}</td>`;
             tbody.appendChild(morningTr);
 
+            // 🌟 복구된 점심시간 위치 자동 계산 로직 🌟
+            let lunchInsertIndex = 4; // 기본값은 4교시 후
+            if (typeof window.dashboardTimes !== 'undefined' && window.dashboardTimes['lunch'] && window.dashboardTimes['lunch'].start) {
+                let count = 0;
+                let hasValidTime = false;
+                const lunchStart = window.dashboardTimes['lunch'].start;
+                for (let i = 1; i <= 6; i++) {
+                    if (window.dashboardTimes[i] && window.dashboardTimes[i].start) {
+                        hasValidTime = true;
+                        if (window.dashboardTimes[i].start <= lunchStart) {
+                            count++;
+                        }
+                    }
+                }
+                if (hasValidTime) {
+                    lunchInsertIndex = count;
+                }
+            }
+
+            // 아침활동 직후가 점심시간인 극단적인 경우 (거의 없겠지만 방어 코드)
+            if (lunchInsertIndex === 0) {
+                const lunchTr = document.createElement('tr'); lunchTr.className = 'lunch-row'; lunchTr.id = 'row-lunch';
+                lunchTr.innerHTML = `<td colspan="5">🍽️ 점심시간 🍽️</td>`;
+                tbody.appendChild(lunchTr);
+            }
+
             for (let i = 1; i <= 6; i++) {
                 const tr = document.createElement('tr');
                 tr.id = `row-${i}`; tr.className = 'period-row'; 
@@ -576,7 +602,8 @@
                 `;
                 tbody.appendChild(tr);
 
-                if (i === 4) { // 4교시 후 점심시간 고정
+                // 🌟 동적으로 계산된 위치에 점심시간 행 추가
+                if (i === lunchInsertIndex) { 
                     const lunchTr = document.createElement('tr'); lunchTr.className = 'lunch-row'; lunchTr.id = 'row-lunch';
                     lunchTr.innerHTML = `<td colspan="5">🍽️ 점심시간 🍽️</td>`;
                     tbody.appendChild(lunchTr);
