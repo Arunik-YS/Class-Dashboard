@@ -493,13 +493,21 @@
                 const data = await response.json();
                 sheetMemoData = data.memos || {};
 
-                // 🌟 복구됨: 시간표 알림 기능용 시간 데이터 세팅
+                // 시간표 알림 기능용 시간 데이터 세팅
                 window.dashboardTimes = {};
                 timeKeys.forEach(t => {
-                    window.dashboardTimes[t.id] = {
-                        start: sheetMemoData[`time_start_${t.id}`] || '',
-                        end: sheetMemoData[`time_end_${t.id}`] || ''
-                    };
+                    let sVal = sheetMemoData[`time_start_${t.id}`] || '';
+                    let eVal = sheetMemoData[`time_end_${t.id}`] || '';
+                    
+                    // 🌟 마법의 코드: 구글 시트의 날짜 형식(1899-12-30T...)을 깔끔한 HH:mm 형식으로 자동 변환
+                    if(sVal.includes('T')) { const d = new Date(sVal); sVal = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+                    if(eVal.includes('T')) { const d = new Date(eVal); eVal = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+
+                    window.dashboardTimes[t.id] = { start: sVal, end: eVal };
+                    
+                    // 관리자 설정 칸에도 에러 없이 정상적으로 뜨게 원본 데이터 덮어쓰기
+                    sheetMemoData[`time_start_${t.id}`] = sVal;
+                    sheetMemoData[`time_end_${t.id}`] = eVal;
                 });
 
                 window.dashboardWeekData = {1:{timetable:{}}, 2:{timetable:{}}, 3:{timetable:{}}, 4:{timetable:{}}, 5:{timetable:{}}};
