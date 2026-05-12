@@ -493,21 +493,23 @@
                 const data = await response.json();
                 sheetMemoData = data.memos || {};
 
-                // 시간표 알림 기능용 시간 데이터 세팅
+                // 🌟 구글 시트의 이상한 날짜 포맷(1899-12-30T...)을 예쁜 시간(HH:mm)으로 강제 변환하는 함수
+                function parseSheetTime(val) {
+                    if (!val) return '';
+                    if (val.includes('T')) {
+                        const d = new Date(val);
+                        return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+                    }
+                    return val;
+                }
+
+                // 시간 데이터 세팅
                 window.dashboardTimes = {};
                 timeKeys.forEach(t => {
-                    let sVal = sheetMemoData[`time_start_${t.id}`] || '';
-                    let eVal = sheetMemoData[`time_end_${t.id}`] || '';
-                    
-                    // 🌟 마법의 코드: 구글 시트의 날짜 형식(1899-12-30T...)을 깔끔한 HH:mm 형식으로 자동 변환
-                    if(sVal.includes('T')) { const d = new Date(sVal); sVal = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
-                    if(eVal.includes('T')) { const d = new Date(eVal); eVal = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
-
-                    window.dashboardTimes[t.id] = { start: sVal, end: eVal };
-                    
-                    // 관리자 설정 칸에도 에러 없이 정상적으로 뜨게 원본 데이터 덮어쓰기
-                    sheetMemoData[`time_start_${t.id}`] = sVal;
-                    sheetMemoData[`time_end_${t.id}`] = eVal;
+                    window.dashboardTimes[t.id] = {
+                        start: parseSheetTime(sheetMemoData[`time_start_${t.id}`]),
+                        end: parseSheetTime(sheetMemoData[`time_end_${t.id}`])
+                    };
                 });
 
                 window.dashboardWeekData = {1:{timetable:{}}, 2:{timetable:{}}, 3:{timetable:{}}, 4:{timetable:{}}, 5:{timetable:{}}};
@@ -525,12 +527,6 @@
                         }
                     });
                 }
-
-                loadTimetable();
-                loadNoticeTabs();
-                loadMemoTask();
-                loadStudentMemo();
-                initAdminForms(); // 관리자 화면에 시간 설정칸도 다시 그립니다.
                 
                 const savedTalk = sheetMemoData['dashboardTeacherTalk'];
                 const talkEl = document.getElementById('teacher-talk-content');
@@ -538,9 +534,18 @@
 
             } catch (error) {
                 console.error("데이터 로드 실패:", error);
+                alert("구글 시트에서 데이터를 불러오지 못했습니다.\n앱스 스크립트의 권한이 '모든 사용자'인지 확인하거나 인터넷 연결을 확인해주세요.");
+            } finally {
+                if (!window.dashboardWeekData) window.dashboardWeekData = {1:{timetable:{}}, 2:{timetable:{}}, 3:{timetable:{}}, 4:{timetable:{}}, 5:{timetable:{}}};
+                if (!window.dashboardTimes) window.dashboardTimes = {};
+                
+                loadTimetable();
+                loadNoticeTabs();
+                loadMemoTask();
+                loadStudentMemo();
+                initAdminForms(); 
             }
         }
-
         function saveToSheet(key, value) {
             fetch(GOOGLE_URL, {
                 method: 'POST',
@@ -721,14 +726,14 @@
             const tabsContainer = document.getElementById('day-tabs-container');
             const panelsContainer = document.getElementById('day-panels-container');
             
-            // 🌟 복구됨: 1. 교시별 운영 시간 설정 UI
+            // 1. 교시별 운영 시간 설정 UI
             let timeHTML = `<table class="admin-table"><tr>`;
             timeKeys.forEach(t => timeHTML += `<th>${t.label}</th>`);
             timeHTML += `</tr><tr>`;
             timeKeys.forEach(t => {
-                // 구글 시트에서 저장된 시간 읽어오기
-                const startVal = sheetMemoData[`time_start_${t.id}`] || '';
-                const endVal = sheetMemoData[`time_end_${t.id}`] || '';
+                // 🌟 원본 대신 깔끔하게 변환된 dashboardTimes 사용!
+                const startVal = (window.dashboardTimes[t.id] && window.dashboardTimes[t.id].start) ? window.dashboardTimes[t.id].start : '';
+                const endVal = (window.dashboardTimes[t.id] && window.dashboardTimes[t.id].end) ? window.dashboardTimes[t.id].end : '';
                 
                 timeHTML += `<td>
                     <span style="font-size:0.9rem; color:#64748b;">시작</span><br>
@@ -769,10 +774,12 @@
         function saveTimeSetting(id, type, value) {
             saveToSheet(`time_${type}_${id}`, value);
             
-            // 현재 화면의 시계 깜빡임 계산 기능에도 실시간 반영
             if (!window.dashboardTimes) window.dashboardTimes = {};
             if (!window.dashboardTimes[id]) window.dashboardTimes[id] = {};
             window.dashboardTimes[id][type] = value;
+            
+            // 🌟 시간이 변경되면 점심시간 위치도 즉시 재계산해서 화면에 그리기
+            loadTimetable();
         }
 
         function switchDayTab(event, dayId) {
