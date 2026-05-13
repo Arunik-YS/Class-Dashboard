@@ -500,7 +500,10 @@
         // =========================================
         async function loadDataFromSheet() {
             try {
-                const response = await fetch(GOOGLE_URL);
+                // 브라우저 캐시를 무시하고 항상 최신 데이터를 불러오도록 타임스탬프와 옵션 추가
+                const response = await fetch(GOOGLE_URL + '?t=' + new Date().getTime(), {
+                    cache: 'no-store'
+                });
                 const data = await response.json();
                 sheetMemoData = data.memos || {};
 
@@ -634,38 +637,60 @@
         }
 
         // =========================================
-        // 4. 데이터 저장 함수들
+        // 4. 데이터 저장 함수들 (디바운싱 적용 버전)
         // =========================================
+        
+        // 🌟 여러 입력창의 타이머를 관리할 객체 추가
+        let saveTimeouts = {};
+
         function saveStudentMemo() {
             const el = document.getElementById('student-memo-content');
-            saveToSheet('studentMemoContent', el.innerHTML); 
-            autoFitStudentMemo();
+            autoFitStudentMemo(); // 글자 크기 맞춤은 즉시 실행
+            
+            // 1초 동안 추가 입력이 없으면 저장
+            clearTimeout(saveTimeouts['studentMemo']);
+            saveTimeouts['studentMemo'] = setTimeout(() => {
+                saveToSheet('studentMemoContent', el.innerHTML); 
+            }, 1000);
         }
+
         function loadStudentMemo() {
             const saved = sheetMemoData['studentMemoContent'];
             const el = document.getElementById('student-memo-content');
             if (el && saved) { el.innerHTML = saved; }
             autoFitStudentMemo();
         }
+
         function saveTeacherTalk() {
             const el = document.getElementById('teacher-talk-content');
-            saveToSheet('dashboardTeacherTalk', el.innerHTML);
+            
+            clearTimeout(saveTimeouts['teacherTalk']);
+            saveTimeouts['teacherTalk'] = setTimeout(() => {
+                saveToSheet('dashboardTeacherTalk', el.innerHTML);
+            }, 1000);
         }
+
         function resetStudentOverride() {
             alert("구글 시트 연동 방식에서는 지원하지 않습니다. [시간표 관리] 탭에서 수정해주세요.");
         }
+
         function saveNoticeTab(tabNum) {
             const el = document.getElementById('notice-page-' + tabNum);
-            saveToSheet('noticeListGrid_' + tabNum, el.innerHTML);
-            autoFitText(el, 45); 
+            autoFitText(el, 45); // 화면 크기 맞춤은 즉각 반응
+            
+            clearTimeout(saveTimeouts['notice_' + tabNum]);
+            saveTimeouts['notice_' + tabNum] = setTimeout(() => {
+                saveToSheet('noticeListGrid_' + tabNum, el.innerHTML);
+            }, 1000);
         }
+
         function loadNoticeTabs() {
             const defaultTexts = [
-                "<ul><li>특이사항 없음</li></ul>", 
-                "<ul><li>안내장 배부</li></ul>", 
-                "<ul><li>국어 활동 풀기</li></ul>", 
-                "<ul><li>미술 준비물 챙기기</li></ul>", 
-                "오늘 하루도 정말 고생 많았습니다! 😊" 
+                '<ul><li>특이사항 없음</li></ul>', 
+                '<ul><li>안내장 배부</li></ul>', 
+                '<ul><li>국어 활동 풀기</li></ul>', 
+                '<ul><li>미술 준비물 챙기기</li></ul>', 
+                '😊' 
             ];
             for (let i = 1; i <= 5; i++) {
                 const saved = sheetMemoData['noticeListGrid_' + i];
@@ -673,13 +698,19 @@
                 if (saved) { el.innerHTML = saved; } else { el.innerHTML = defaultTexts[i-1]; }
             }
         }
+
         function saveMemoTask() {
             const el = document.getElementById('memo-task-content');
-            saveToSheet('memoTaskContent', el.innerHTML);
             autoFitText(el, 120);
+
+            clearTimeout(saveTimeouts['memoTask']);
+            saveTimeouts['memoTask'] = setTimeout(() => {
+                saveToSheet('memoTaskContent', el.innerHTML);
+            }, 1000);
         }
+
         function loadMemoTask() {
-            const defaultText = "자율 학습 시간입니다. 🤫";
+            const defaultText = "🤫";
             const saved = sheetMemoData['memoTaskContent'];
             const el = document.getElementById('memo-task-content');
             if (el) { el.innerHTML = saved ? saved : defaultText; }
